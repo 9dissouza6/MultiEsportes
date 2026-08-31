@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Meus Agendamentos — MultiEsportes</title>
+  <link rel="stylesheet" href="../css/global.css"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .bookings-page { padding: 110px 0 80px; }
+
+    .page-title {
+      font-family: var(--font-display);
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+    }
+    .page-subtitle { color: var(--text-muted); margin-bottom: 40px; }
+
+    /* Abas */
+    .tab-nav {
+      display: flex;
+      gap: 4px;
+      background: var(--dark-2);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius);
+      padding: 4px;
+      width: fit-content;
+      margin-bottom: 32px;
+    }
+    .tab-btn {
+      background: none; border: none;
+      font-family: var(--font-body); font-size: 0.9rem; font-weight: 600;
+      color: var(--text-muted); padding: 8px 20px; border-radius: 8px;
+      cursor: pointer; transition: var(--transition);
+    }
+    .tab-btn.active { background: var(--card-bg); color: var(--text); }
+
+    /* Booking card (expandido) */
+    .booking-card-big {
+      background: var(--card-bg);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 20px;
+      align-items: center;
+      transition: var(--transition);
+      margin-bottom: 16px;
+    }
+    .booking-card-big:hover { border-color: var(--border); }
+
+    .bc-icon {
+      width: 64px; height: 64px;
+      background: var(--dark-3);
+      border-radius: 12px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .bc-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    .bc-info h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; }
+    .bc-meta {
+      display: flex; flex-wrap: wrap; gap: 14px;
+      font-size: 0.82rem; color: var(--text-muted);
+    }
+    .bc-meta span { display: flex; align-items: center; gap: 4px; }
+
+    .bc-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+    .bc-price {
+      font-family: var(--font-display);
+      font-size: 1.6rem;
+      color: var(--green);
+      letter-spacing: 0.04em;
+    }
+
+    .status-badge {
+      font-size: 0.75rem; font-weight: 700;
+      padding: 4px 12px; border-radius: 100px;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .status-confirmed { background: rgba(0,230,118,0.12); color: var(--green); border: 1px solid var(--border); }
+    .status-cancelled { background: rgba(255,82,82,0.1); color: #ff5252; border: 1px solid rgba(255,82,82,0.2); }
+    .status-past { background: var(--dark-4); color: var(--text-dim); border: 1px solid var(--border-subtle); }
+
+    .cancel-btn {
+      background: none; border: 1px solid rgba(255,82,82,0.3);
+      color: #ff5252; font-family: var(--font-body); font-size: 0.8rem;
+      padding: 5px 12px; border-radius: 6px; cursor: pointer; transition: var(--transition);
+    }
+    .cancel-btn:hover { background: rgba(255,82,82,0.1); }
+
+    .empty-state {
+      text-align: center; padding: 80px 20px;
+      color: var(--text-muted);
+    }
+    .empty-state .big-icon { font-size: 4rem; display: block; margin-bottom: 20px; }
+    .empty-state p { margin-bottom: 24px; font-size: 1rem; }
+
+    @media (max-width: 700px) {
+      .booking-card-big { grid-template-columns: auto 1fr; }
+      .bc-right { grid-column: 1/-1; flex-direction: row; justify-content: space-between; align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar scrolled" id="navbar">
+    <a href="../index.html" class="logo"><img src="../assets/logo.png" alt="MultiEsportes" class="logo-img"/><span class="logo-text">Multi<span>Esportes</span></span></a>
+    <ul class="nav-links">
+      <li><a href="quadras.html">Quadras</a></li>
+      <li><a href="agendamento.html">Agendar</a></li>
+      <li><a href="sobre.html">Sobre</a></li>
+    </ul>
+    <div class="nav-actions" id="navActions">
+      <a href="login.html" class="btn-outline">Entrar</a>
+    </div>
+    <button class="hamburger" id="hamburger">&#9776;</button>
+  </nav>
+
+  <main class="bookings-page">
+    <div class="container">
+      <h1 class="page-title">Meus Agendamentos</h1>
+      <p class="page-subtitle">Gerencie todas as suas reservas em um só lugar.</p>
+
+      <div class="tab-nav">
+        <button class="tab-btn active" data-filter="upcoming">Próximos</button>
+        <button class="tab-btn" data-filter="past">Histórico</button>
+        <button class="tab-btn" data-filter="all">Todos</button>
+      </div>
+
+      <div id="bookingsList">
+        <div class="empty-state">
+          <span class="big-icon">⏳</span>
+          <p>Carregando agendamentos...</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="../index.html" class="logo"><span class="logo-text">Multi<span>Esportes</span></span></a>
+          <p>A plataforma que conecta atletas e espaços esportivos.</p>
+        </div>
+        <div class="footer-links">
+          <h4>Navegação</h4>
+          <ul>
+            <li><a href="quadras.html">Quadras</a></li>
+            <li><a href="agendamento.html">Agendamento</a></li>
+            <li><a href="sobre.html">Sobre</a></li>
+          </ul>
+        </div>
+        <div class="footer-links">
+          <h4>Conta</h4>
+          <ul>
+            <li><a href="login.html">Entrar</a></li>
+            <li><a href="cadastro.html">Cadastrar</a></li>
+            <li><a href="perfil.html">Meu Perfil</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom"><p>© 2026 MultiEsportes</p></div>
+    </div>
+  </footer>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase.js"></script>
+  <script src="../js/global.js"></script>
+  <script>
+    const ICONS = {
+      futebol: '../assets/quadras/futebol-society.jpg',
+      basquete: '../assets/quadras/basquete.jpg',
+      tenis: '../assets/quadras/tenis-externa.jpg',
+      volei: '../assets/quadras/volei.jpg',
+      padel: 'https://commons.wikimedia.org/wiki/Special:FilePath/Campo_de_Padel.jpg?width=200',
+      outros: 'https://commons.wikimedia.org/wiki/Special:FilePath/Aerial_Pickleball_Courts.jpg?width=200',
+    };
+    let allBookings = [];
+    let currentFilter = 'upcoming';
+    const today = new Date().toISOString().split('T')[0];
+
+    async function init() {
+      const session = await requireAuth();
+      if (!session) return;
+
+      const { data, error } = await getUserBookings(session.user.id);
+      allBookings = data || [];
+      renderList();
+    }
+
+    function renderList() {
+      const list = document.getElementById('bookingsList');
+      let filtered = allBookings.filter(b => {
+        if (currentFilter === 'upcoming') return b.booking_date >= today && b.status !== 'cancelled';
+        if (currentFilter === 'past') return b.booking_date < today || b.status === 'cancelled';
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <span class="big-icon">📅</span>
+            <p>Nenhum agendamento ${currentFilter === 'upcoming' ? 'futuro' : currentFilter === 'past' ? 'passado' : ''} encontrado.</p>
+            <a href="agendamento.html" class="btn-primary">Fazer uma reserva</a>
+          </div>`;
+        return;
+      }
+
+      list.innerHTML = filtered.map(b => {
+        const sport = b.spaces?.sport_type || 'outros';
+        const isUpcoming = b.booking_date >= today && b.status !== 'cancelled';
+        const statusClass = b.status === 'cancelled' ? 'status-cancelled'
+                          : !isUpcoming ? 'status-past' : 'status-confirmed';
+        const statusLabel = b.status === 'cancelled' ? 'Cancelado'
+                          : !isUpcoming ? 'Concluído' : 'Confirmado';
+
+        return `
+          <div class="booking-card-big">
+            <div class="bc-icon"><img src="${ICONS[sport] || ICONS.outros}" alt="${sport}"/></div>
+            <div class="bc-info">
+              <h3>${b.spaces?.name || 'Espaço'}</h3>
+              <div class="bc-meta">
+                <span>📅 ${formatDate(b.booking_date)}</span>
+                <span>⏰ ${b.start_time} – ${b.end_time}</span>
+                <span>📍 ${b.spaces?.address || ''}</span>
+              </div>
+            </div>
+            <div class="bc-right">
+              <div class="bc-price">R$ ${b.total_price}</div>
+              <span class="status-badge ${statusClass}">${statusLabel}</span>
+              ${isUpcoming ? `<button class="cancel-btn" onclick="cancelar('${b.id}')">Cancelar</button>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    async function cancelar(id) {
+      if (!confirm('Deseja cancelar este agendamento?')) return;
+      const { error } = await cancelBooking(id);
+      if (error) { showToast('Erro ao cancelar.', 'error'); return; }
+      const booking = allBookings.find(b => b.id === id);
+      if (booking) booking.status = 'cancelled';
+      renderList();
+      showToast('Agendamento cancelado com sucesso.');
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFilter = btn.dataset.filter;
+        renderList();
+      });
+    });
+
+    init();
+  </script>
+</body>
+</html>
