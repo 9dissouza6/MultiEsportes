@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cadastro — MultiEsportes</title>
+  <link rel="stylesheet" href="../css/global.css"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <nav class="navbar scrolled" id="navbar">
+    <a href="../index.html" class="logo"><img src="../assets/logo.png" alt="MultiEsportes" class="logo-img"/><span class="logo-text">Multi<span>Esportes</span></span></a>
+    <div class="nav-actions" id="navActions">
+      <a href="login.html" class="btn-outline">Já tenho conta</a>
+    </div>
+  </nav>
+
+  <main class="auth-page">
+    <div class="auth-card" style="max-width:540px">
+      <a href="../index.html" class="logo"><span class="logo-text">Multi<span>Esportes</span></span></a>
+      <p class="auth-subtitle">Crie sua conta gratuita e comece a reservar.</p>
+
+      <div class="alert" id="alert"></div>
+
+      <form id="cadastroForm" novalidate>
+        <div class="form-group">
+          <label for="nome">Nome completo</label>
+          <input type="text" id="nome" placeholder="João da Silva" required autocomplete="name"/>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="email">E-mail</label>
+            <input type="email" id="email" placeholder="seu@email.com" required autocomplete="email"/>
+          </div>
+          <div class="form-group">
+            <label for="telefone">Telefone</label>
+            <input type="tel" id="telefone" placeholder="(00) 90000-0000" maxlength="15"/>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="senha">Senha</label>
+            <input type="password" id="senha" placeholder="mín. 6 caracteres" required/>
+          </div>
+          <div class="form-group">
+            <label for="confirmarSenha">Confirmar senha</label>
+            <input type="password" id="confirmarSenha" placeholder="repita a senha" required/>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:24px">
+          <input type="checkbox" id="termos" style="margin-top:4px;width:16px;height:16px;cursor:pointer;accent-color:var(--green)"/>
+          <label for="termos" style="font-size:0.875rem;color:var(--text-muted);cursor:pointer">
+            Concordo com os <a href="#" style="color:var(--green)">Termos de Uso</a> e a
+            <a href="#" style="color:var(--green)">Política de Privacidade</a>
+          </label>
+        </div>
+
+        <button type="submit" class="btn-primary" style="width:100%;justify-content:center;gap:10px" id="submitBtn">
+          <span class="spinner" id="spinner"></span>
+          Criar Conta
+        </button>
+
+        <div class="divider">ou</div>
+
+        <p style="text-align:center;font-size:0.9rem;color:var(--text-muted)">
+          Já tem conta? <a href="login.html" style="color:var(--green);font-weight:600">Entrar</a>
+        </p>
+      </form>
+    </div>
+  </main>
+
+  <!-- CDN primeiro, depois nossos scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase.js"></script>
+  <script src="../js/global.js"></script>
+  <script>
+    // Máscara de telefone
+    document.getElementById('telefone').addEventListener('input', function () {
+      let v = this.value.replace(/\D/g, '').slice(0, 11);
+      if (v.length > 7) v = `(${v.slice(0,2)}) ${v.slice(2,7)}-${v.slice(7)}`;
+      else if (v.length > 2) v = `(${v.slice(0,2)}) ${v.slice(2)}`;
+      else if (v.length > 0) v = `(${v}`;
+      this.value = v;
+    });
+
+    const alertEl  = document.getElementById('alert');
+    const spinner  = document.getElementById('spinner');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function setAlert(msg, type = 'error') {
+      alertEl.textContent = msg;
+      alertEl.className = `alert alert-${type} show`;
+    }
+
+    document.getElementById('cadastroForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      alertEl.className = 'alert'; // esconde alerta anterior
+
+      const nome     = document.getElementById('nome').value.trim();
+      const email    = document.getElementById('email').value.trim();
+      const telefone = document.getElementById('telefone').value.trim();
+      const senha    = document.getElementById('senha').value;
+      const confirmar = document.getElementById('confirmarSenha').value;
+      const termos   = document.getElementById('termos').checked;
+
+      // Validações
+      if (!nome)           { setAlert('Preencha seu nome.'); return; }
+      if (!email)          { setAlert('Preencha seu e-mail.'); return; }
+      if (!senha)          { setAlert('Preencha sua senha.'); return; }
+      if (senha.length < 6){ setAlert('A senha deve ter pelo menos 6 caracteres.'); return; }
+      if (senha !== confirmar) { setAlert('As senhas não coincidem.'); return; }
+      if (!termos)         { setAlert('Aceite os Termos de Uso para continuar.'); return; }
+
+      // Loading
+      spinner.classList.add('show');
+      submitBtn.disabled = true;
+      setAlert('Criando sua conta...', 'info');
+
+      try {
+        const { data, error } = await signUp(email, senha, nome, { phone: telefone });
+
+        if (error) {
+          console.error('Erro Supabase:', error);
+          const msgs = {
+            'User already registered': 'Este e-mail já está cadastrado.',
+            'Password should be at least 6 characters': 'Senha muito curta.',
+            'Unable to validate email address: invalid format': 'E-mail inválido.',
+          };
+          setAlert(msgs[error.message] || `Erro: ${error.message}`);
+          return;
+        }
+
+        // O Supabase, por segurança, não retorna "error" quando o e-mail já existe
+        // e já foi confirmado — ele volta com sucesso, mas identities: []
+        const emailJaCadastrado = data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0;
+
+        if (emailJaCadastrado) {
+          setAlert('Este e-mail já está cadastrado. Faça login ou recupere sua senha.');
+          return;
+        }
+
+        // Tenta salvar também na tabela profiles (funciona de imediato se a
+        // confirmação por e-mail estiver desativada no projeto; caso contrário,
+        // o nome/telefone já ficaram salvos no metadata acima e são sincronizados
+        // com a tabela profiles no primeiro acesso ao perfil).
+        if (data.user) {
+          await updateProfile(data.user.id, {
+            full_name: nome,
+            phone: telefone,
+          });
+        }
+
+        setAlert('✅ Conta criada com sucesso! Verifique seu e-mail para confirmar o cadastro.', 'success');
+        document.getElementById('cadastroForm').reset();
+
+      } catch (err) {
+        console.error('Erro inesperado:', err);
+        setAlert('Erro inesperado. Abra o console (F12) para mais detalhes.');
+      } finally {
+        spinner.classList.remove('show');
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
